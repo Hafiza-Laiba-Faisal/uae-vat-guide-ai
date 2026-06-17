@@ -14,16 +14,133 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      fta_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          created_at: string
+          document_id: string
+          embedding: string
+          id: string
+          section: string | null
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          created_at?: string
+          document_id: string
+          embedding: string
+          id?: string
+          section?: string | null
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          created_at?: string
+          document_id?: string
+          embedding?: string
+          id?: string
+          section?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fta_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "fta_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fta_documents: {
+        Row: {
+          chunk_count: number
+          content_hash: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          source_kind: string
+          source_url: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          chunk_count?: number
+          content_hash?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          source_kind?: string
+          source_url?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          chunk_count?: number
+          content_hash?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          source_kind?: string
+          source_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      claim_initial_admin: { Args: never; Returns: boolean }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      match_fta_chunks: {
+        Args: {
+          match_count?: number
+          query_embedding: string
+          similarity_threshold?: number
+        }
+        Returns: {
+          chunk_id: string
+          content: string
+          document_id: string
+          section: string
+          similarity: number
+          source_url: string
+          title: string
+        }[]
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +267,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
