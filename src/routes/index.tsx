@@ -2,7 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { DefaultChatTransport } from "ai";
 import { useMemo, useState } from "react";
-import { ScalesIcon, SendIcon, SparklesIcon } from "lucide-react";
+import { ScaleIcon, SendIcon, SparklesIcon } from "lucide-react";
 
 import {
   Conversation,
