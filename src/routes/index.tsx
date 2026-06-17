@@ -73,7 +73,7 @@ function ChatPage() {
       <header className="border-b bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-brand-foreground shadow-sm">
-            <ScalesIcon className="h-5 w-5" />
+            <ScaleIcon className="h-5 w-5" />
           </div>
           <div className="flex-1">
             <h1 className="text-base font-semibold leading-tight text-foreground">
