@@ -23,9 +23,9 @@ function chunk(over: Partial<RetrievedChunk> = {}): RetrievedChunk {
 describe("buildRagSystemPrompt", () => {
   it("returns a strict fallback prompt when no chunks are retrieved", () => {
     const p = buildRagSystemPrompt([]);
-    expect(p).toContain("No relevant FTA excerpts");
+    expect(p).toContain("No FTA excerpts passed the relevance threshold");
     expect(p).toContain(NO_MATCH_FALLBACK);
-    expect(p).toMatch(/Do not guess/);
+    expect(p).toMatch(/Do NOT guess/);
   });
 
   it("embeds excerpts and forces bracketed citations when chunks exist", () => {
@@ -33,7 +33,7 @@ describe("buildRagSystemPrompt", () => {
     expect(p).toContain("[1]");
     expect(p).toContain("[2]");
     expect(p).toContain("Executive Regulations");
-    expect(p).toContain("=== FTA EXCERPTS ===");
+    expect(p).toContain("=== RETRIEVED EXCERPTS ===");
     expect(p).toContain("=== END EXCERPTS ===");
     expect(p).toMatch(/HIGH/);
   });

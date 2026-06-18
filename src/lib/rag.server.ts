@@ -1,13 +1,14 @@
 /**
- * Server-only RAG retrieval. Embeds a query and calls the
- * match_fta_chunks() SQL function via the Supabase admin client.
+ * Server-only RAG retrieval.
+ * Embeds a query and calls match_fta_chunks() which returns
+ * priority-boosted results (high-tier law chunks rank first).
  */
 import { embedOne } from "./embeddings.server";
 import { SIMILARITY_THRESHOLD, type RetrievedChunk } from "./rag-prompt";
 
 export async function retrieveChunks(
   query: string,
-  matchCount = 5,
+  matchCount = 8,
   threshold = SIMILARITY_THRESHOLD,
 ): Promise<RetrievedChunk[]> {
   if (!query.trim()) return [];

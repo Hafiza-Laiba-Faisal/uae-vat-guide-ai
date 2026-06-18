@@ -1,50 +1,28 @@
 /**
- * Server-only embeddings client. Calls the Lovable AI Gateway /v1/embeddings
- * endpoint with `openai/text-embedding-3-small` (1536 dims, HNSW-safe).
+ * Server-only embeddings using Mistral mistral-embed.
+ * Same provider as chat — no extra API key needed.
+ * Output dims: 1024
  */
+import { createMistral } from "@ai-sdk/mistral";
+import { embed, embedMany } from "ai";
 
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/embeddings";
-export const EMBEDDING_MODEL = "openai/text-embedding-3-small";
-export const EMBEDDING_DIMS = 1536;
+export const EMBEDDING_MODEL = "mistral-embed";
+export const EMBEDDING_DIMS = 1024;
 
-interface EmbeddingResponse {
-  data: Array<{ embedding: number[]; index: number }>;
-  model: string;
-  usage?: { prompt_tokens: number; total_tokens: number };
-}
-
-function requireKey(): string {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY is not configured");
-  return key;
+function getModel() {
+  const apiKey = process.env.MISTRAL_API_KEY;
+  if (!apiKey) throw new Error("MISTRAL_API_KEY is not configured");
+  const mistral = createMistral({ apiKey });
+  return mistral.textEmbeddingModel(EMBEDDING_MODEL);
 }
 
 export async function embedTexts(inputs: string[]): Promise<number[][]> {
   if (inputs.length === 0) return [];
-  const key = requireKey();
-  const res = await fetch(GATEWAY_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": key,
-    },
-    body: JSON.stringify({
-      model: EMBEDDING_MODEL,
-      input: inputs,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Embedding request failed (${res.status}): ${body || res.statusText}`);
-  }
-
-  const json = (await res.json()) as EmbeddingResponse;
-  const sorted = [...json.data].sort((a, b) => a.index - b.index);
-  return sorted.map((d) => d.embedding);
+  const { embeddings } = await embedMany({ model: getModel(), values: inputs });
+  return embeddings;
 }
 
 export async function embedOne(input: string): Promise<number[]> {
-  const [v] = await embedTexts([input]);
-  return v;
+  const { embedding } = await embed({ model: getModel(), value: input });
+  return embedding;
 }

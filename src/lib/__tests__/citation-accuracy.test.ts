@@ -61,8 +61,8 @@ describe("citation accuracy contract", () => {
 
   it("prompt is grounded — refuses general-knowledge answers", () => {
     const prompt = buildRagSystemPrompt(seed([0.8]));
-    expect(prompt).toMatch(/answer ONLY using the excerpts/i);
-    expect(prompt).toMatch(/Do not pad with general VAT knowledge/i);
+    expect(prompt).toMatch(/Only cite indices listed in VALID CITATION INDICES/i);
+    expect(prompt).toMatch(/then stop/i);
   });
 
   it("an answer with no [N] citations against a non-empty chunk set is detectable", () => {

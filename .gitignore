@@ -7,20 +7,27 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
 .output
 .vinxi
 .tanstack/**
 .nitro
-*.local
+
+# Environment variables — NEVER commit
+.env
+.env.*
+!.env.example
 
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
 
-# Editor directories and files
+# Editor
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -30,3 +37,23 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python virtual environments
+.venv
+.venv-linux
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Browser profile (Selenium/RPA artifacts — large, not needed in repo)
+Website Documents Scraper/browser_profile/
+
+# Downloaded PDFs and scraped docs (large binary files)
+Website Documents Scraper/downloads/
+docs/*.txt
+docs/*.pdf
+
+# Lock files (keep bun.lock, ignore npm)
+package-lock.json

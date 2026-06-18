@@ -1,6 +1,7 @@
 import {
   claimInitialAdmin,
   deleteDocument,
+  getDocumentChunks,
   getMyRole,
   ingestDocument,
   listDocuments,
@@ -17,7 +18,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeftIcon, RefreshCwIcon, ShieldIcon, Trash2Icon, UploadIcon } from "lucide-react";
+import { ArrowLeftIcon, DownloadIcon, GlobeIcon, RefreshCwIcon, ShieldIcon, Trash2Icon, UploadIcon, ZapIcon } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -35,6 +36,9 @@ function AdminPage() {
   const deleteFn = useServerFn(deleteDocument);
   const refreshFn = useServerFn(triggerFtaRefresh);
   const claimFn = useServerFn(claimInitialAdmin);
+  const getChunksFn = useServerFn(getDocumentChunks);
+
+  const [scrapeMode, setScrapeMode] = useState<"firecrawl" | "direct">("firecrawl");
 
   const role = useQuery({ queryKey: ["role"], queryFn: () => fetchRole() });
   const docs = useQuery({
@@ -42,7 +46,6 @@ function AdminPage() {
     queryFn: () => fetchDocs(),
     enabled: role.data?.isAdmin === true,
   });
-
   const ingest = useMutation({
     mutationFn: (vars: { title: string; content: string; sourceUrl?: string }) =>
       ingestFn({ data: { ...vars, sourceKind: "manual" } }),
@@ -68,7 +71,7 @@ function AdminPage() {
   });
 
   const refresh = useMutation({
-    mutationFn: () => refreshFn({ data: {} }),
+    mutationFn: () => refreshFn({ data: { mode: scrapeMode } }),
     onSuccess: (r) => {
       if (r.notConfigured) {
         toast.warning(r.message ?? "Firecrawl not connected");
@@ -93,17 +96,79 @@ function AdminPage() {
         toast.error("An admin already exists. Ask an existing admin to grant you access.");
       }
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Claim failed"),
+    onError: (e) => {
+      console.error("[claim admin]", e);
+      toast.error(e instanceof Error ? e.message : "Claim failed — check console for details");
+    },
   });
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [url, setUrl] = useState("");
+  const [customUrls, setCustomUrls] = useState("");
+
+  const scrapeCustom = useMutation({
+    mutationFn: () => {
+      const urls = customUrls
+        .split("\n")
+        .map((u) => u.trim())
+        .filter((u) => u.startsWith("http"));
+      if (urls.length === 0) throw new Error("No valid URLs entered");
+      return refreshFn({ data: { mode: scrapeMode, urls } });
+    },
+    onSuccess: (r) => {
+      const indexed = r.processed.filter((p) => p.status === "indexed").length;
+      const failed = r.processed.filter((p) => p.status === "failed").length;
+      toast.success(`Scraped: ${indexed} indexed, ${failed} failed`);
+      if (failed > 0) {
+        r.processed
+          .filter((p) => p.status === "failed")
+          .forEach((p) => toast.error(`${p.title}: ${p.error}`));
+      }
+      qc.invalidateQueries({ queryKey: ["docs"] });
+      setCustomUrls("");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Scrape failed"),
+  });
 
   const handleFile = async (file: File) => {
     const text = await file.text();
     setContent(text);
     if (!title) setTitle(file.name.replace(/\.[^.]+$/, ""));
+  };
+
+  const downloadDocument = async (id: string, docTitle: string) => {
+    try {
+      const { doc, chunks } = await getChunksFn({ data: { id } });
+      const lines: string[] = [
+        `TITLE: ${doc.title}`,
+        `SOURCE: ${doc.source_url ?? "manual"}`,
+        `KIND: ${doc.source_kind}`,
+        `INDEXED: ${new Date(doc.updated_at).toLocaleString()}`,
+        `CHUNKS: ${chunks.length}`,
+        "═".repeat(60),
+        "",
+      ];
+      for (const c of chunks) {
+        lines.push(`── Chunk ${c.chunk_index + 1}${c.section ? ` — ${c.section}` : ""} ──`);
+        // Add line numbers
+        c.content.split("\n").forEach((line, i) => {
+          lines.push(`L${i + 1}: ${line}`);
+        });
+        lines.push("");
+      }
+      const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${docTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Download failed");
+    }
   };
 
   const signOut = async () => {
@@ -146,15 +211,72 @@ function AdminPage() {
               Manage source documents that ground the chatbot's answers.
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
-            <RefreshCwIcon className="mr-2 h-3.5 w-3.5" />
-            {refresh.isPending ? "Refreshing…" : "Refresh from FTA"}
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Scrape mode toggle */}
+            <div className="flex items-center rounded-lg border bg-background p-0.5 text-xs">
+              <button
+                onClick={() => setScrapeMode("firecrawl")}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-colors ${
+                  scrapeMode === "firecrawl"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <ZapIcon className="h-3 w-3" />
+                Firecrawl
+              </button>
+              <button
+                onClick={() => setScrapeMode("direct")}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-colors ${
+                  scrapeMode === "direct"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <GlobeIcon className="h-3 w-3" />
+                Direct
+              </button>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
+              <RefreshCwIcon className="mr-2 h-3.5 w-3.5" />
+              {refresh.isPending ? "Refreshing…" : "Refresh from FTA"}
+            </Button>
+          </div>
           <Button variant="ghost" size="sm" onClick={signOut}>Sign out</Button>
         </div>
       </header>
 
       <main className="mx-auto grid max-w-5xl gap-6 px-4 py-6 md:grid-cols-[1fr_1.3fr]">
+        {/* Custom URL Scraper — full width */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base">Scrape custom URLs</CardTitle>
+            <CardDescription>
+              Paste one or more URLs (one per line). Supports web pages and PDFs from UAE Legislation, FTA, and MoF.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Textarea
+              value={customUrls}
+              onChange={(e) => setCustomUrls(e.target.value)}
+              placeholder={`https://uaelegislation.gov.ae/en/legislations/1226/download\nhttps://tax.gov.ae/en/taxes/vat.aspx\nhttps://mof.gov.ae/en/public-finance/tax/value-added-tax-vat/`}
+              className="min-h-[100px] font-mono text-xs"
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => scrapeCustom.mutate()}
+                disabled={!customUrls.trim() || scrapeCustom.isPending}
+                size="sm"
+              >
+                <GlobeIcon className="mr-2 h-3.5 w-3.5" />
+                {scrapeCustom.isPending ? "Scraping…" : "Scrape URLs"}
+              </Button>
+              <span className="text-[11px] text-muted-foreground">
+                Uses {scrapeMode === "firecrawl" ? "Firecrawl" : "Direct"} mode · switch in header
+              </span>
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Add document</CardTitle>
@@ -266,15 +388,26 @@ function AdminPage() {
                         )}
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => {
-                        if (confirm(`Delete "${d.title}"?`)) remove.mutate(d.id);
-                      }}
-                    >
-                      <Trash2Icon className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Download indexed content"
+                        onClick={() => downloadDocument(d.id, d.title)}
+                      >
+                        <DownloadIcon className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Delete document"
+                        onClick={() => {
+                          if (confirm(`Delete "${d.title}"?`)) remove.mutate(d.id);
+                        }}
+                      >
+                        <Trash2Icon className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </li>
                 ))}
               </ul>

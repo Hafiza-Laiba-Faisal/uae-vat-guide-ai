@@ -1,10 +1,12 @@
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { createMistral } from "@ai-sdk/mistral";
 
-export const createLovableAiGatewayProvider = (apiKey: string) =>
-  createOpenAICompatible({
-    name: "lovable-ai",
-    baseURL: "https://ai.gateway.lovable.dev/v1",
-    headers: {
-      "Lovable-API-Key": apiKey,
-    },
-  });
+/**
+ * Returns a Mistral chat model instance.
+ * Requires MISTRAL_API_KEY in environment.
+ */
+export function createChatModel() {
+  const apiKey = process.env.MISTRAL_API_KEY;
+  if (!apiKey) throw new Error("MISTRAL_API_KEY is not configured");
+  const mistral = createMistral({ apiKey });
+  return mistral("mistral-large-latest");
+}

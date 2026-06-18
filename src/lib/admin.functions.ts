@@ -24,7 +24,7 @@ async function assertAdmin(
 
 export const ingestDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => IngestSchema.parse(input))
+  .validator((input: unknown) => IngestSchema.parse(input))
   .handler(async ({ data, context }) => {
     void assertAdmin;
     const { supabase, userId } = context;
@@ -133,9 +133,9 @@ export const listDocuments = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
-export const deleteDocument = createServerFn({ method: "POST" })
+export const getDocumentChunks = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: isAdmin } = await supabase.rpc("has_role", {
@@ -143,7 +143,39 @@ export const deleteDocument = createServerFn({ method: "POST" })
       _role: "admin",
     });
     if (!isAdmin) throw new Error("Forbidden: admin role required");
-    const { error } = await supabase.from("fta_documents").delete().eq("id", data.id);
+
+    // Get document meta
+    const { data: doc, error: docErr } = await supabase
+      .from("fta_documents")
+      .select("id, title, source_url, source_kind, chunk_count, updated_at")
+      .eq("id", data.id)
+      .single();
+    if (docErr) throw new Error(docErr.message);
+
+    // Get all chunks ordered by index (no embedding column — too large)
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: chunks, error: chunkErr } = await supabaseAdmin
+      .from("fta_chunks")
+      .select("chunk_index, section, content")
+      .eq("document_id", data.id)
+      .order("chunk_index", { ascending: true });
+    if (chunkErr) throw new Error(chunkErr.message);
+
+    return { doc, chunks: chunks ?? [] };
+  });
+
+export const deleteDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: isAdmin } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Forbidden: admin role required");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("fta_documents").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -168,12 +200,13 @@ export const getMyRole = createServerFn({ method: "GET" })
   });
 
 const RefreshSchema = z.object({
-  urls: z.array(z.string().url()).max(20).optional(),
+  urls: z.array(z.string().min(1)).max(20).optional(),
+  mode: z.enum(["firecrawl", "direct"]).default("firecrawl"),
 });
 
 export const triggerFtaRefresh = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => RefreshSchema.parse(input ?? {}))
+  .validator((input: unknown) => RefreshSchema.parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: isAdmin } = await supabase.rpc("has_role", {
@@ -183,5 +216,5 @@ export const triggerFtaRefresh = createServerFn({ method: "POST" })
     if (!isAdmin) throw new Error("Forbidden: admin role required");
 
     const { refreshFtaFromFirecrawl } = await import("./fta-updater.server");
-    return refreshFtaFromFirecrawl(data.urls);
+    return refreshFtaFromFirecrawl(data.urls, data.mode);
   });

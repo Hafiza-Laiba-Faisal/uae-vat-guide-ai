@@ -1,8 +1,8 @@
 import { useChat } from "@ai-sdk/react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { DefaultChatTransport } from "ai";
 import { useMemo, useState } from "react";
-import { ScaleIcon, SendIcon, SparklesIcon } from "lucide-react";
+import { ScaleIcon, SendIcon, SparklesIcon, SettingsIcon } from "lucide-react";
 
 import {
   Conversation,
@@ -86,6 +86,13 @@ function ChatPage() {
           <span className="hidden rounded-full border bg-accent px-3 py-1 text-[11px] font-medium text-accent-foreground sm:inline-block">
             Guidance only · Not legal advice
           </span>
+          <Link
+            to="/auth"
+            aria-label="Admin"
+            className="ml-1 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <SettingsIcon className="h-4 w-4" />
+          </Link>
         </div>
       </header>
 

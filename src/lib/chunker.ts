@@ -27,15 +27,20 @@ const DEFAULT_OVERLAP = 500; // ~150 tokens
 
 /**
  * Heuristically detect a section heading from the first line of a chunk.
- * Recognises "Article 12", "Section 3.2", "Chapter Two", "VATP015 — ...".
+ * Recognises "Article 12", "Section 3.2", "Chapter Two", "VATP015 — ...",
+ * and common FTA web page headings like "Value Added Tax", "What is VAT?" etc.
  */
 export function detectSection(text: string): string | undefined {
   const firstLine = text.split("\n", 1)[0]?.trim();
   if (!firstLine) return undefined;
-  const m = firstLine.match(
-    /^(article|section|chapter|clause|part|annex|vatp\s*\d+|cabinet decision[^\n]*)/i,
+
+  // Only match known legal/FTA heading prefixes — do not match regular sentences
+  const legal = firstLine.match(
+    /^(article|section|chapter|clause|part|annex|vatp\s*\d+|cabinet decision[^\n]*|federal decree|executive regulation)/i,
   );
-  return m ? firstLine.slice(0, 160) : undefined;
+  if (legal) return firstLine.slice(0, 160);
+
+  return undefined;
 }
 
 export function chunkText(input: string, opts: ChunkOptions = {}): Chunk[] {
@@ -70,10 +75,12 @@ export function chunkText(input: string, opts: ChunkOptions = {}): Chunk[] {
     if (para.length > maxChars) {
       // Hard-slice oversized paragraph
       if (buffer.trim()) flush();
+      // Reset buffer — overlap was already flushed; don't prepend it to hard slices
+      buffer = "";
       let cursor = 0;
       while (cursor < para.length) {
         const slice = para.slice(cursor, cursor + maxChars);
-        buffer = (buffer ? buffer + "\n\n" : "") + slice;
+        buffer = slice;
         flush();
         cursor += Math.max(1, maxChars - overlap);
       }
