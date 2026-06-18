@@ -89,7 +89,7 @@ export const Route = createFileRoute("/api/chat")({
 
           // ── Layer 4: Build system prompt with rule context ─────────────
           const ruleContext = buildRuleContext(intent);
-          const ragPrompt = buildRagSystemPrompt(chunks);
+          const ragPrompt = buildRagSystemPrompt(chunks, query);
 
           // Prepend deterministic rule answer if available
           const deterministicPrefix = intent.rule_engine_answer && intent.is_deterministic

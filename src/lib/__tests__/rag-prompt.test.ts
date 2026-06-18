@@ -29,7 +29,11 @@ describe("buildRagSystemPrompt", () => {
   });
 
   it("embeds excerpts and forces bracketed citations when chunks exist", () => {
-    const p = buildRagSystemPrompt([chunk(), chunk({ chunk_id: "c2", section: "Article 45", similarity: 0.71 })]);
+    // Expert query → expert mode → full legal hierarchy visible
+    const p = buildRagSystemPrompt(
+      [chunk(), chunk({ chunk_id: "c2", section: "Article 45", similarity: 0.71 })],
+      "which article applies and what is the legal basis?",
+    );
     expect(p).toContain("[1]");
     expect(p).toContain("[2]");
     expect(p).toContain("Executive Regulations");
@@ -39,13 +43,29 @@ describe("buildRagSystemPrompt", () => {
   });
 
   it("downgrades confidence label when top similarity is below the high threshold", () => {
-    const p = buildRagSystemPrompt([chunk({ similarity: 0.55 })]);
+    const p = buildRagSystemPrompt(
+      [chunk({ similarity: 0.55 })],
+      "cite the article number and legal basis",
+    );
     expect(p).toMatch(/MODERATE/);
   });
 
   it("keeps the fallback instruction available even when chunks exist", () => {
     const p = buildRagSystemPrompt([chunk()]);
     expect(p).toContain(NO_MATCH_FALLBACK);
+  });
+
+  it("uses concise mode for simple queries — no legal hierarchy shown", () => {
+    const p = buildRagSystemPrompt([chunk()], "is food zero rated?");
+    expect(p).toContain("RESPONSE MODE: CONCISE");
+    expect(p).not.toContain("LEGAL HIERARCHY");
+    expect(p).not.toContain("STRICT ANSWERING RULES");
+  });
+
+  it("uses expert mode when user asks for article numbers", () => {
+    const p = buildRagSystemPrompt([chunk()], "which article covers zero-rated exports?");
+    expect(p).toContain("LEGAL HIERARCHY");
+    expect(p).toContain("STRICT ANSWERING RULES");
   });
 });
 

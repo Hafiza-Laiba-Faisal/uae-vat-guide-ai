@@ -40,7 +40,8 @@ describe("citation accuracy contract", () => {
 
   it("every [N] index a model emits must exist in the supplied chunks", () => {
     const chunks = seed([0.9, 0.85, 0.8]);
-    const prompt = buildRagSystemPrompt(chunks);
+    // Expert query so citation contract is enforced in prompt
+    const prompt = buildRagSystemPrompt(chunks, "cite the article and legal basis for each point");
     // Valid simulated answer
     const valid = "Exports outside the GCC are zero-rated [1] and the registration threshold is AED 375,000 [3].";
     const cited = extractCitationIndices(valid);
@@ -53,14 +54,15 @@ describe("citation accuracy contract", () => {
   });
 
   it("flags HIGH confidence only when top similarity ≥ threshold", () => {
-    const high = buildRagSystemPrompt(seed([HIGH_CONFIDENCE_THRESHOLD + 0.05, 0.6]));
-    const low = buildRagSystemPrompt(seed([HIGH_CONFIDENCE_THRESHOLD - 0.05, 0.4]));
+    const expertQ = "which article number applies here?";
+    const high = buildRagSystemPrompt(seed([HIGH_CONFIDENCE_THRESHOLD + 0.05, 0.6]), expertQ);
+    const low = buildRagSystemPrompt(seed([HIGH_CONFIDENCE_THRESHOLD - 0.05, 0.4]), expertQ);
     expect(high).toMatch(/HIGH/);
     expect(low).toMatch(/MODERATE/);
   });
 
   it("prompt is grounded — refuses general-knowledge answers", () => {
-    const prompt = buildRagSystemPrompt(seed([0.8]));
+    const prompt = buildRagSystemPrompt(seed([0.8]), "cite the legal basis and article number");
     expect(prompt).toMatch(/Only cite indices listed in VALID CITATION INDICES/i);
     expect(prompt).toMatch(/then stop/i);
   });

@@ -141,7 +141,36 @@ function assessConfidence(chunks: RetrievedChunk[]): ConfidenceState {
   return "moderate";
 }
 
-export function buildRagSystemPrompt(chunks: RetrievedChunk[]): string {
+// ── Response depth detection ──────────────────────────────────────────────────
+
+const EXPERT_TRIGGERS = [
+  /\barticle\b/i,
+  /\bcitation/i,
+  /\bcite\b/i,
+  /\blegal basis/i,
+  /\bwhich (law|rule|regulation|article)/i,
+  /\bprevail/i,
+  /\bhypothetical/i,
+  /\bwhat if\b/i,
+  /\bsection \d/i,
+  /\bfdl\b/i,
+  /\bfederal decree/i,
+  /\bcabinet decision/i,
+  /\bvatp\d/i,
+  /\bdetailed reasoning/i,
+  /\bexplain in detail/i,
+  /\bwhy (is|does|would)/i,
+  /\bprove\b/i,
+  /\bsource\b/i,
+  /\bauthority\b/i,
+  /\breference\b/i,
+];
+
+export function isExpertQuery(userQuery: string): boolean {
+  return EXPERT_TRIGGERS.some((re) => re.test(userQuery));
+}
+
+export function buildRagSystemPrompt(chunks: RetrievedChunk[], userQuery = ""): string {
   // ── No relevant chunks found ──────────────────────────────────────────────
   if (chunks.length === 0) {
     return `${BASE_PERSONA}
@@ -156,6 +185,7 @@ You may optionally suggest how the user could rephrase their question after the 
   }
 
   // ── Confidence + citation validation ─────────────────────────────────────
+  const expertMode = isExpertQuery(userQuery);
   const state = assessConfidence(chunks);
   const citationRegistry = buildCitationRegistry(chunks);
   const validCitations = [...citationRegistry].filter((s) => s.startsWith("[")).join(", ");
@@ -238,6 +268,28 @@ You may optionally suggest how the user could rephrase their question after the 
     })
     .join("\n");
 
+  // ── CONCISE MODE — default for simple public-facing questions ────────────
+  if (!expertMode) {
+    const conciseExcerpts = chunks
+      .map((c, i) => `[${i + 1}] ${c.content.trim()}`)
+      .join("\n\n---\n\n");
+
+    return `${BASE_PERSONA}
+
+=== RESPONSE MODE: CONCISE ===
+Answer in plain language. Keep the answer under 150 words.
+Do NOT show document ranks, legal hierarchy, source indices, or internal reasoning.
+Do NOT use headers like "Legal Rule" or "Binding Law".
+Cite sources only as natural inline references if needed (e.g. "per FTA guidance").
+If the excerpts do not clearly answer the question: "${NO_MATCH_FALLBACK}"
+
+${currencyWarning ? currencyWarning.trim() + "\n" : ""}
+=== RETRIEVED EXCERPTS ===
+${conciseExcerpts}
+=== END EXCERPTS ===`;
+  }
+
+  // ── EXPERT MODE — triggered by legal/citation/detailed queries ───────────
   return `${BASE_PERSONA}
 ${LEGAL_HIERARCHY}
 
