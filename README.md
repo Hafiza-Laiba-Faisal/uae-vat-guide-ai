@@ -64,7 +64,7 @@ Website Documents Scraper/
 ### 1. Install JS dependencies
 
 ```bash
-bun install
+npm install
 ```
 
 ### 2. Environment variables
@@ -163,7 +163,7 @@ After first ingest, run `scripts/update-metadata.sql` in Supabase SQL editor to 
 ### 5. Run dev server
 
 ```bash
-bun run dev
+npm run dev
 ```
 
 ### 6. Python dependencies (for scripts only)
