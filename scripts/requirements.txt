@@ -1,0 +1,29 @@
+# Python dependencies for UAE VAT Guide AI scripts
+#
+# Install:
+#   pip install -r scripts/requirements.txt
+#
+# Or use the bundled venv (recommended — already has all deps):
+#   "Website Documents Scraper/.venv-linux/bin/python" scripts/bulk-ingest-pdfs.py
+#
+# Note: bulk-ingest-pdfs.py auto-injects the venv site-packages,
+# so plain `python3 scripts/bulk-ingest-pdfs.py` works without manual activation.
+
+# PDF text extraction
+pdfminer.six
+
+# HTTP client — Supabase REST API + Mistral embeddings API
+requests
+requests-toolbelt
+
+# HTML scraping (scrape-sources.py)
+beautifulsoup4
+
+# Cloudflare bypass scraper (scrape-sources.py)
+cloudscraper
+
+# Headless browser automation (Browser RPA Bot.py, Scraper.py)
+playwright
+
+# Character encoding detection (transitive dep of requests)
+charset-normalizer
